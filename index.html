@@ -253,11 +253,8 @@
   const noSleepVideo = document.getElementById("noSleep");
 
   async function requestWake() {
-    // modern API first (iPadOS 16.4+, ignored in Low Power Mode)
-    try {
-      if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
-    } catch (e) { /* denied or unsupported */ }
-    // fallback: a silent looping video keeps iOS from sleeping
+    // Start the silent video FIRST, synchronously inside the tap, so iOS counts
+    // it as user-initiated. This MUST run before any await or iOS blocks it.
     try {
       if (noSleepVideo) {
         noSleepVideo.currentTime = 0;
@@ -265,6 +262,10 @@
         if (p && p.catch) p.catch(function () {});
       }
     } catch (e) {}
+    // Then the modern wake lock API (iPadOS 16.4+, ignored in Low Power Mode).
+    try {
+      if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
+    } catch (e) { /* denied or unsupported */ }
   }
   function releaseWake() {
     try { if (wakeLock) { wakeLock.release(); wakeLock = null; } } catch (e) {}
