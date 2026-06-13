@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+<title>25:00 · Focus</title>
+<meta name="description" content="A calm focus timer. One tap to start." />
+<meta name="theme-color" content="#14161b" />
+<!-- add-to-home-screen / full-screen app on iPad & iPhone -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Focus" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="icon" type="image/png" href="icon-180.png" />
+<link rel="manifest" href="manifest.json" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #14161b;
+    --bg-soft: #1b1e26;
+    --text: #eceae3;
+    --muted: #6f7480;
+    --muted-soft: rgba(236, 234, 227, 0.08);
+    --track: rgba(236, 234, 227, 0.07);
+    --accent: #e0a552;            /* warm lamplight */
+    --accent-glow: rgba(224, 165, 82, 0.28);
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Inter", -apple-system, system-ui, sans-serif;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 40px;
+    padding: max(32px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
+    -webkit-tap-highlight-color: transparent;
+    overflow: hidden;
+  }
+
+  /* ambient glow that warms the room while focusing */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background: radial-gradient(60% 55% at 50% 42%, var(--accent-glow), transparent 70%);
+    opacity: 0;
+    transition: opacity 1.2s var(--ease);
+    pointer-events: none;
+    z-index: 0;
+  }
+  body.running::before { opacity: 1; }
+
+  /* preset selector */
+  .presets {
+    display: flex;
+    gap: 4px;
+    padding: 5px;
+    background: var(--bg-soft);
+    border-radius: 100px;
+    position: relative;
+    z-index: 1;
+  }
+  .preset {
+    appearance: none;
+    border: none;
+    background: transparent;
+    color: var(--muted);
+    font-family: inherit;
+    font-size: 14px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    padding: 9px 15px;
+    border-radius: 100px;
+    cursor: pointer;
+    transition: color 0.3s var(--ease), background 0.3s var(--ease);
+  }
+  .preset:hover { color: var(--text); }
+  .preset[aria-pressed="true"] {
+    color: var(--bg);
+    background: var(--text);
+  }
+  .preset:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+  /* the dial */
+  .dial {
+    position: relative;
+    width: min(78vw, 340px);
+    aspect-ratio: 1;
+    display: grid;
+    place-items: center;
+    cursor: pointer;
+    z-index: 1;
+  }
+  .dial svg { width: 100%; height: 100%; transform: rotate(-90deg); display: block; }
+  .ring-track { fill: none; stroke: var(--track); stroke-width: 4; }
+  .ring-fill {
+    fill: none;
+    stroke: var(--accent);
+    stroke-width: 4;
+    stroke-linecap: round;
+    filter: drop-shadow(0 0 6px var(--accent-glow));
+  }
+
+  .face {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+  }
+  .eyebrow {
+    font-family: "Fraunces", Georgia, serif;
+    font-style: italic;
+    font-weight: 400;
+    font-size: 17px;
+    color: var(--accent);
+    letter-spacing: 0.01em;
+  }
+  .time {
+    font-size: clamp(56px, 17vw, 84px);
+    font-weight: 300;
+    line-height: 1;
+    letter-spacing: -0.02em;
+    font-variant-numeric: tabular-nums;
+    color: var(--text);
+  }
+  .time.editable { cursor: text; border-bottom: 1px dashed transparent; }
+  .dial.idle:hover .time.editable { border-bottom-color: var(--muted); }
+  .hint {
+    font-size: 12px;
+    color: var(--muted);
+    height: 14px;
+    letter-spacing: 0.02em;
+  }
+
+  /* controls */
+  .controls {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    z-index: 1;
+  }
+  .btn {
+    appearance: none;
+    font-family: inherit;
+    cursor: pointer;
+    border-radius: 100px;
+    transition: transform 0.15s var(--ease), background 0.3s var(--ease), color 0.3s var(--ease), border-color 0.3s var(--ease);
+  }
+  .btn:active { transform: scale(0.96); }
+  .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+
+  .btn-primary {
+    border: none;
+    background: var(--accent);
+    color: var(--bg);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    padding: 15px 44px;
+    min-width: 148px;
+  }
+  .btn-primary:hover { filter: brightness(1.06); }
+
+  .btn-ghost {
+    border: 1px solid var(--muted-soft);
+    background: transparent;
+    color: var(--muted);
+    font-size: 14px;
+    font-weight: 500;
+    padding: 14px 22px;
+  }
+  .btn-ghost:hover { color: var(--text); border-color: var(--muted); }
+
+  @media (prefers-reduced-motion: reduce) {
+    *, body::before { transition: none !important; animation: none !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="presets" role="group" aria-label="Timer length in minutes">
+    <button class="preset" data-min="5">5</button>
+    <button class="preset" data-min="10">10</button>
+    <button class="preset" data-min="15">15</button>
+    <button class="preset" data-min="25" aria-pressed="true">25</button>
+    <button class="preset" data-min="30">30</button>
+  </div>
+
+  <div class="dial idle" id="dial" role="button" tabindex="0" aria-label="Start or pause the timer">
+    <svg viewBox="0 0 100 100" aria-hidden="true">
+      <circle class="ring-track" cx="50" cy="50" r="46" />
+      <circle class="ring-fill" id="ringFill" cx="50" cy="50" r="46" />
+    </svg>
+    <div class="face">
+      <div class="eyebrow">Focus</div>
+      <div class="time editable" id="time">25:00</div>
+      <div class="hint" id="hint">tap to start</div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <button class="btn btn-primary" id="startBtn">Start</button>
+    <button class="btn btn-ghost" id="resetBtn">Reset</button>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  const R = 46;
+  const CIRC = 2 * Math.PI * R;
+
+  const els = {
+    body: document.body,
+    dial: document.getElementById("dial"),
+    ring: document.getElementById("ringFill"),
+    time: document.getElementById("time"),
+    hint: document.getElementById("hint"),
+    startBtn: document.getElementById("startBtn"),
+    resetBtn: document.getElementById("resetBtn"),
+    presets: Array.from(document.querySelectorAll(".preset")),
+  };
+
+  els.ring.style.strokeDasharray = CIRC;
+
+  let total = 25 * 60;
+  let remaining = total;
+  let running = false;
+  let ticker = null;
+  let endAt = 0; // wall-clock target, so background tabs stay accurate
+  let wakeLock = null; // keeps the screen awake while running (iPad/laptop)
+
+  async function requestWake() {
+    try {
+      if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
+    } catch (e) { /* denied or unsupported — timer still works */ }
+  }
+  function releaseWake() {
+    try { if (wakeLock) { wakeLock.release(); wakeLock = null; } } catch (e) {}
+  }
+
+  function fmt(secs) {
+    const s = Math.max(0, Math.round(secs));
+    const m = Math.floor(s / 60);
+    const r = s % 60;
+    return String(m).padStart(2, "0") + ":" + String(r).padStart(2, "0");
+  }
+
+  function render() {
+    const label = fmt(remaining);
+    els.time.textContent = label;
+    document.title = label + " · Focus";
+    const progress = total > 0 ? remaining / total : 0;
+    els.ring.style.strokeDashoffset = CIRC * (1 - progress);
+    els.startBtn.textContent = running ? "Pause" : (remaining < total ? "Resume" : "Start");
+    els.dial.classList.toggle("idle", !running && remaining === total);
+    els.time.classList.toggle("editable", !running && remaining === total);
+    if (running) els.hint.textContent = "tap to pause";
+    else if (remaining < total) els.hint.textContent = "tap to resume";
+    else els.hint.textContent = "tap to start";
+  }
+
+  function tick() {
+    remaining = (endAt - Date.now()) / 1000;
+    if (remaining <= 0) { remaining = 0; finish(); return; }
+    render();
+  }
+
+  function start() {
+    if (running || remaining <= 0) return;
+    running = true;
+    endAt = Date.now() + remaining * 1000;
+    els.body.classList.add("running");
+    ticker = setInterval(tick, 200);
+    requestWake();
+    render();
+  }
+
+  function pause() {
+    if (!running) return;
+    running = false;
+    clearInterval(ticker);
+    remaining = (endAt - Date.now()) / 1000;
+    els.body.classList.remove("running"); releaseWake();
+    render();
+  }
+
+  function toggle() { running ? pause() : start(); }
+
+  function reset() {
+    running = false;
+    clearInterval(ticker);
+    remaining = total;
+    els.body.classList.remove("running"); releaseWake();
+    render();
+  }
+
+  function setMinutes(mins, fromPreset) {
+    total = mins * 60;
+    running = false;
+    clearInterval(ticker);
+    remaining = total;
+    els.body.classList.remove("running"); releaseWake();
+    els.presets.forEach((b) =>
+      b.setAttribute("aria-pressed", String(fromPreset && Number(b.dataset.min) === mins))
+    );
+    render();
+  }
+
+  function finish() {
+    running = false;
+    clearInterval(ticker);
+    els.body.classList.remove("running"); releaseWake();
+    chime();
+    render();
+    flash();
+  }
+
+  // bright temple bell via Web Audio (no files needed): an E5 strike with
+  // inharmonic partials and a crisp, shimmery decay
+  function chime() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      const ctx = new Ctx();
+      if (ctx.state === "suspended") ctx.resume();
+      const now = ctx.currentTime + 0.02;
+
+      // gentle bus so the stacked partials stay clean
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -16; comp.ratio.value = 4;
+      comp.attack.value = 0.003; comp.release.value = 0.25;
+      const bus = ctx.createGain();
+      bus.gain.value = 0.85;
+      bus.connect(comp).connect(ctx.destination);
+
+      const fund = 659.25; // E5
+      const peak = 0.46;
+      const attack = 0.003;
+      const partials = [
+        [1.00, 1.00, 2.4],
+        [2.76, 0.60, 1.8],
+        [5.40, 0.38, 1.1],
+        [8.93, 0.20, 0.6],
+      ];
+      let maxEnd = 0;
+      partials.forEach(([ratio, gMul, decay]) => {
+        const osc = ctx.createOscillator();
+        const g = ctx.createGain();
+        osc.type = "sine";
+        osc.frequency.value = fund * ratio;
+        g.gain.setValueAtTime(0.0001, now);
+        g.gain.exponentialRampToValueAtTime(peak * gMul, now + attack);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + attack + decay);
+        osc.connect(g).connect(bus);
+        osc.start(now);
+        osc.stop(now + attack + decay + 0.06);
+        maxEnd = Math.max(maxEnd, attack + decay + 0.1);
+      });
+
+      setTimeout(() => ctx.close(), (0.02 + maxEnd + 0.3) * 1000);
+    } catch (e) { /* audio not available, no problem */ }
+  }
+
+  function flash() {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    els.dial.animate(
+      [{ opacity: 1 }, { opacity: 0.35 }, { opacity: 1 }, { opacity: 0.35 }, { opacity: 1 }],
+      { duration: 1100, easing: "ease-in-out" }
+    );
+  }
+
+  // tap-to-edit a custom length when idle
+  function editTime() {
+    if (running || remaining !== total) return;
+    const input = prompt("Set minutes:", String(Math.round(total / 60)));
+    if (input === null) return;
+    const mins = parseInt(input, 10);
+    if (!isNaN(mins) && mins > 0 && mins <= 180) setMinutes(mins, false);
+  }
+
+  // events
+  els.startBtn.addEventListener("click", toggle);
+  els.resetBtn.addEventListener("click", reset);
+  els.presets.forEach((b) =>
+    b.addEventListener("click", () => setMinutes(Number(b.dataset.min), true))
+  );
+
+  els.dial.addEventListener("click", (e) => {
+    if (e.target === els.time && !running && remaining === total) { editTime(); return; }
+    toggle();
+  });
+  els.dial.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggle(); }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "INPUT") return;
+    if (e.key === " ") { e.preventDefault(); toggle(); }
+    else if (e.key.toLowerCase() === "r") { reset(); }
+    else if (e.key === "1") { setMinutes(5, true); }
+    else if (e.key === "2") { setMinutes(10, true); }
+    else if (e.key === "3") { setMinutes(15, true); }
+    else if (e.key === "4") { setMinutes(25, true); }
+    else if (e.key === "5") { setMinutes(30, true); }
+  });
+
+  // re-sync when returning to a backgrounded tab
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden && running) { requestWake(); tick(); }
+  });
+
+  render();
+})();
+</script>
+</body>
+</html>
