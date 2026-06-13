@@ -2,9 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
 <title>25:00 · Focus</title>
 <meta name="description" content="A calm focus timer. One tap to start." />
+<meta name="theme-color" content="#14161b" />
+<!-- add-to-home-screen / full-screen app on iPad & iPhone -->
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Focus" />
+<link rel="apple-touch-icon" href="icon-180.png" />
+<link rel="icon" type="image/png" href="icon-180.png" />
+<link rel="manifest" href="manifest.json" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@1,9..144,400;1,9..144,500&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet" />
@@ -35,7 +44,7 @@
     align-items: center;
     justify-content: center;
     gap: 40px;
-    padding: 32px 20px;
+    padding: max(32px, env(safe-area-inset-top)) max(20px, env(safe-area-inset-right)) max(32px, env(safe-area-inset-bottom)) max(20px, env(safe-area-inset-left));
     -webkit-tap-highlight-color: transparent;
     overflow: hidden;
   }
@@ -183,6 +192,13 @@
 </style>
 </head>
 <body>
+  <!-- silent looping clip: a hardy fallback that stops iOS sleeping while the timer runs -->
+  <video id="noSleep" muted loop playsinline preload="auto" aria-hidden="true" tabindex="-1"
+         style="position:fixed;right:0;bottom:0;width:2px;height:2px;opacity:0.01;pointer-events:none;border:0;">
+    <source src="data:video/mp4;base64,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" type="video/mp4" />
+    <source src="data:video/webm;base64,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" type="video/webm" />
+  </video>
+
   <div class="presets" role="group" aria-label="Timer length in minutes">
     <button class="preset" data-min="5">5</button>
     <button class="preset" data-min="10">10</button>
@@ -233,6 +249,27 @@
   let running = false;
   let ticker = null;
   let endAt = 0; // wall-clock target, so background tabs stay accurate
+  let wakeLock = null; // keeps the screen awake while running (iPad/laptop)
+  const noSleepVideo = document.getElementById("noSleep");
+
+  async function requestWake() {
+    // modern API first (iPadOS 16.4+, ignored in Low Power Mode)
+    try {
+      if ("wakeLock" in navigator) wakeLock = await navigator.wakeLock.request("screen");
+    } catch (e) { /* denied or unsupported */ }
+    // fallback: a silent looping video keeps iOS from sleeping
+    try {
+      if (noSleepVideo) {
+        noSleepVideo.currentTime = 0;
+        const p = noSleepVideo.play();
+        if (p && p.catch) p.catch(function () {});
+      }
+    } catch (e) {}
+  }
+  function releaseWake() {
+    try { if (wakeLock) { wakeLock.release(); wakeLock = null; } } catch (e) {}
+    try { if (noSleepVideo) noSleepVideo.pause(); } catch (e) {}
+  }
 
   function fmt(secs) {
     const s = Math.max(0, Math.round(secs));
@@ -267,6 +304,7 @@
     endAt = Date.now() + remaining * 1000;
     els.body.classList.add("running");
     ticker = setInterval(tick, 200);
+    requestWake();
     render();
   }
 
@@ -275,7 +313,7 @@
     running = false;
     clearInterval(ticker);
     remaining = (endAt - Date.now()) / 1000;
-    els.body.classList.remove("running");
+    els.body.classList.remove("running"); releaseWake();
     render();
   }
 
@@ -285,7 +323,7 @@
     running = false;
     clearInterval(ticker);
     remaining = total;
-    els.body.classList.remove("running");
+    els.body.classList.remove("running"); releaseWake();
     render();
   }
 
@@ -294,7 +332,7 @@
     running = false;
     clearInterval(ticker);
     remaining = total;
-    els.body.classList.remove("running");
+    els.body.classList.remove("running"); releaseWake();
     els.presets.forEach((b) =>
       b.setAttribute("aria-pressed", String(fromPreset && Number(b.dataset.min) === mins))
     );
@@ -304,56 +342,55 @@
   function finish() {
     running = false;
     clearInterval(ticker);
-    els.body.classList.remove("running");
+    els.body.classList.remove("running"); releaseWake();
     chime();
     render();
     flash();
   }
 
-  // soft gong via Web Audio (no files needed): warm strike with inharmonic
-  // shimmer and a long, gentle decay, rolled off by a lowpass so it stays soft
+  // bright temple bell via Web Audio (no files needed): an E5 strike with
+  // inharmonic partials and a crisp, shimmery decay
   function chime() {
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
       const ctx = new Ctx();
       if (ctx.state === "suspended") ctx.resume();
-      const now = ctx.currentTime;
+      const now = ctx.currentTime + 0.02;
 
-      const master = ctx.createGain();
-      master.gain.setValueAtTime(0.0001, now);
-      master.gain.exponentialRampToValueAtTime(0.34, now + 0.04);
-      master.gain.exponentialRampToValueAtTime(0.0001, now + 4.0);
+      // gentle bus so the stacked partials stay clean
+      const comp = ctx.createDynamicsCompressor();
+      comp.threshold.value = -16; comp.ratio.value = 4;
+      comp.attack.value = 0.003; comp.release.value = 0.25;
+      const bus = ctx.createGain();
+      bus.gain.value = 0.85;
+      bus.connect(comp).connect(ctx.destination);
 
-      const lp = ctx.createBiquadFilter();
-      lp.type = "lowpass";
-      lp.frequency.setValueAtTime(2600, now);
-      lp.frequency.exponentialRampToValueAtTime(650, now + 3.5);
-      master.connect(lp).connect(ctx.destination);
-
-      const fundamental = 196; // G3 — low and warm
+      const fund = 659.25; // E5
+      const peak = 0.46;
+      const attack = 0.003;
       const partials = [
-        { r: 1.00, g: 1.00, d: 4.0 },
-        { r: 2.01, g: 0.50, d: 3.2 },
-        { r: 2.78, g: 0.32, d: 2.4 },
-        { r: 3.93, g: 0.22, d: 1.8 },
-        { r: 5.40, g: 0.14, d: 1.2 },
+        [1.00, 1.00, 2.4],
+        [2.76, 0.60, 1.8],
+        [5.40, 0.38, 1.1],
+        [8.93, 0.20, 0.6],
       ];
-      partials.forEach((p) => {
+      let maxEnd = 0;
+      partials.forEach(([ratio, gMul, decay]) => {
         const osc = ctx.createOscillator();
         const g = ctx.createGain();
         osc.type = "sine";
-        osc.frequency.value = fundamental * p.r;
-        osc.detune.value = Math.random() * 6 - 3; // slight metallic shimmer
+        osc.frequency.value = fund * ratio;
         g.gain.setValueAtTime(0.0001, now);
-        g.gain.exponentialRampToValueAtTime(p.g, now + 0.02);
-        g.gain.exponentialRampToValueAtTime(0.0001, now + p.d);
-        osc.connect(g).connect(master);
+        g.gain.exponentialRampToValueAtTime(peak * gMul, now + attack);
+        g.gain.exponentialRampToValueAtTime(0.0001, now + attack + decay);
+        osc.connect(g).connect(bus);
         osc.start(now);
-        osc.stop(now + p.d + 0.1);
+        osc.stop(now + attack + decay + 0.06);
+        maxEnd = Math.max(maxEnd, attack + decay + 0.1);
       });
 
-      setTimeout(() => ctx.close(), 4600);
+      setTimeout(() => ctx.close(), (0.02 + maxEnd + 0.3) * 1000);
     } catch (e) { /* audio not available, no problem */ }
   }
 
@@ -402,7 +439,7 @@
 
   // re-sync when returning to a backgrounded tab
   document.addEventListener("visibilitychange", () => {
-    if (!document.hidden && running) tick();
+    if (!document.hidden && running) { requestWake(); tick(); }
   });
 
   render();
