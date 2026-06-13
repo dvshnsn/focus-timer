@@ -251,6 +251,42 @@
   let endAt = 0; // wall-clock target, so background tabs stay accurate
   let wakeLock = null; // keeps the screen awake while running (iPad/laptop)
   const noSleepVideo = document.getElementById("noSleep");
+  let audioCtx = null; // one persistent, tap-unlocked audio channel for the bell
+
+  // iOS only lets a page make sound through an audio context unlocked by a tap.
+  // Call this from the Start tap so the bell can ring later, untapped, at 0:00.
+  function unlockAudio() {
+    try {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      if (!Ctx) return;
+      if (!audioCtx) audioCtx = new Ctx();
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      const buf = audioCtx.createBuffer(1, 1, 22050); // 1 frame of silence unlocks iOS
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf; src.connect(audioCtx.destination); src.start(0);
+    } catch (e) {}
+  }
+
+  // Keep the audio session alive while the timer runs with an inaudible tone, so
+  // iOS can't put the channel to sleep before the bell needs to ring.
+  let keepWarm = null;
+  function startKeepWarm() {
+    try {
+      if (!audioCtx || keepWarm) return;
+      const o = audioCtx.createOscillator();
+      const g = audioCtx.createGain();
+      g.gain.value = 0.0008; // far below hearing — just keeps the pipeline open
+      o.type = "sine"; o.frequency.value = 20;
+      o.connect(g).connect(audioCtx.destination);
+      o.start();
+      keepWarm = { o: o, g: g };
+    } catch (e) {}
+  }
+  function stopKeepWarm() {
+    try {
+      if (keepWarm) { keepWarm.o.stop(); keepWarm.o.disconnect(); keepWarm.g.disconnect(); keepWarm = null; }
+    } catch (e) {}
+  }
 
   async function requestWake() {
     // Start the silent video FIRST, synchronously inside the tap, so iOS counts
@@ -270,6 +306,7 @@
   function releaseWake() {
     try { if (wakeLock) { wakeLock.release(); wakeLock = null; } } catch (e) {}
     try { if (noSleepVideo) noSleepVideo.pause(); } catch (e) {}
+    stopKeepWarm();
   }
 
   function fmt(secs) {
@@ -305,6 +342,8 @@
     endAt = Date.now() + remaining * 1000;
     els.body.classList.add("running");
     ticker = setInterval(tick, 200);
+    unlockAudio();
+    startKeepWarm();
     requestWake();
     render();
   }
@@ -355,8 +394,9 @@
     try {
       const Ctx = window.AudioContext || window.webkitAudioContext;
       if (!Ctx) return;
-      const ctx = new Ctx();
-      if (ctx.state === "suspended") ctx.resume();
+      if (!audioCtx) audioCtx = new Ctx();   // best effort if never unlocked
+      if (audioCtx.state === "suspended") audioCtx.resume();
+      const ctx = audioCtx;                   // reuse the tap-unlocked channel
       const now = ctx.currentTime + 0.02;
 
       // gentle bus so the stacked partials stay clean
@@ -391,7 +431,7 @@
         maxEnd = Math.max(maxEnd, attack + decay + 0.1);
       });
 
-      setTimeout(() => ctx.close(), (0.02 + maxEnd + 0.3) * 1000);
+      // keep the context open — it's reused for the next ring
     } catch (e) { /* audio not available, no problem */ }
   }
 
